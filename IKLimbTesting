@@ -4,53 +4,49 @@ using UnityEngine;
 
 public class IKTesting : MonoBehaviour
 {
+    public enum interpolationType{ bezier, linear};
+    public interpolationType lineType;
+
     public int boneLength; //amount of bones
     public Transform targetTransform;
     public Transform baseTransform;
 
+    [Header("Curve Variables")]
     private Vector3 frontCurve;
     public Vector3 frontCurveEdit;
     private Vector3 backCurve;
     public Vector3 backCurveEdit;
-    
 
     public Transform[] boneTransform;
 
-    float extendedDistance;
+    [Header("Bone Distances")]
+    float extendedDistanceTotal;
+    float[] extendedDistaceForBones;
     float totalDistance;
     float[] boneDistance;
+
+    [Header("Curve Interpolation")]
+    public int Iterations = 25;
+    public float[] arcDistance;
+    float arcDistanceTotal;
+
 
     Quaternion[] boneRotation;
 
     Vector3[] bonePositionL;
     Vector3[] bonePositionG;
 
-
-    [Header("Delete and make local Variables")]
-    //layer 1 bezier curve cubic
-    public Vector3 position1;
-    public Vector3 position2;  // these need to be decided through a script
-    public Vector3 position3;   //
-    public Vector3 position4;
-    //layer 2
-    public Vector3[] positionA;
-    public Vector3[] positionB;
-    public Vector3[] positionC;
-    //layer 3
-    public Vector3[] positionD;
-    public Vector3[] positionE;
-    //layer 4
-    public Vector3[] finalPosition;
-    //T is the %completion of the curve in .00
-    public float[] t;
     private void Start()
     {
         // get array length here
         boneTransform = new Transform[boneLength];
-        boneDistance = new float[boneLength - 1];
+        extendedDistaceForBones = new float[boneLength];
         boneRotation = new Quaternion[boneLength];
         bonePositionL = new Vector3[boneLength];
         bonePositionG = new Vector3[boneLength];
+
+        arcDistance = new float[Iterations+1];
+        arcDistance[0] = 0;
 
         int i = 0;
         Transform recurseBoneTransform; //could make an array of base transforms for multiple limbs
@@ -61,6 +57,7 @@ public class IKTesting : MonoBehaviour
             if (i == 0)
             {
                 boneTransform.SetValue(baseTransform, 0);
+                extendedDistaceForBones.SetValue(0, 0);
             }
 
             if (i < boneLength - 1)
@@ -78,13 +75,15 @@ public class IKTesting : MonoBehaviour
                 Vector3 initialposition = boneTransform[i - 1].position;
                 Vector3 finalPosition = boneTransform[i].position;
                 float distance = Vector3.Distance(initialposition, finalPosition);
-                boneDistance.SetValue(distance, i - 1);
+                extendedDistaceForBones.SetValue(distance, i);
+
+                extendedDistanceTotal += distance;
             }
         }
     }
     private void Update()
     {
-        PositionCalculation();
+        BezierCalculation();
         //to Remove just to avoid null errors, should be given by call
         frontCurve = baseTransform.localPosition + frontCurveEdit;
         backCurve = targetTransform.localPosition + backCurveEdit;
@@ -95,46 +94,62 @@ public class IKTesting : MonoBehaviour
      * need actual position with bones that shouldnt be attached
      * normalize target distance if above max distance
      */
-    public void PositionCalculation()
+    public void BezierCalculation()
     {
-        int i = 0;
-        
+        int iterationI = 0;
+        int boneI = 0;
+        arcDistanceTotal = 0;
+        float arcDistanceCumulative = 0;
+
+        Vector3[] finishedPosition = new Vector3[boneLength];
+
         //layer 1 bezier curve cubic
         Vector3 position1 = baseTransform.position;
         Vector3 position2 = frontCurve;  // these need to be decided through a script
         Vector3 position3 = backCurve;   //
         Vector3 position4 = targetTransform.position;
         //layer 2
-        Vector3[] positionA = new Vector3[boneLength];
-        Vector3[] positionB = new Vector3[boneLength];
-        Vector3[] positionC = new Vector3[boneLength];
+        Vector3 positionA;
+        Vector3 positionB;
+        Vector3 positionC;
         //layer 3
-        Vector3[] positionD = new Vector3[boneLength];
-        Vector3[] positionE = new Vector3[boneLength];
+        Vector3 positionD;
+        Vector3 positionE;
         //layer 4
-        Vector3[] finalPosition = new Vector3[boneLength];
-        //T is the %completion of the curve in .00
-        float[] t = new float[boneLength];
+        Vector3[] BezierCurvePos = new Vector3[Iterations];
+        BezierCurvePos.SetValue(Vector3.zero, 0);
+        //T is the %completion of the curve
+        float[] t = new float[Iterations];
         //firstArrayValue should be 0
-        for(i = 0; i <= boneLength - 1; i++)
+
+        //iterations
+        for (iterationI = 1; iterationI <= Iterations - 1; iterationI++)
         {
-            t.SetValue((float)i/(float)boneLength + 1/(float)boneLength, i);
-            
-            positionA.SetValue(Vector3.Lerp(position1, position2, t[i]), i);
-            positionB.SetValue(Vector3.Lerp(position2, position3, t[i]), i);
-            positionC.SetValue(Vector3.Lerp(position3, position4, t[i]), i);
+            #region bezier calculations
+            t.SetValue((float)iterationI / (float)Iterations, iterationI);
 
-            positionD.SetValue(Vector3.Lerp(positionA[i], positionB[i], t[i]), i);
-            positionE.SetValue(Vector3.Lerp(positionB[i], positionC[i], t[i]), i);
+            positionA = Vector3.Lerp(position1, position2, t[iterationI]);
+            positionB = Vector3.Lerp(position2, position3, t[iterationI]);
+            positionC = Vector3.Lerp(position3, position4, t[iterationI]);
 
-            finalPosition.SetValue(Vector3.Lerp(positionD[i], positionE[i], t[i]), i);
+            positionD = Vector3.Lerp(positionA, positionB, t[iterationI]);
+            positionE = Vector3.Lerp(positionB, positionC, t[iterationI]);
 
-            bonePositionG.SetValue(finalPosition[i], i);
+            BezierCurvePos.SetValue(Vector3.Lerp(positionD, positionE, t[iterationI]), iterationI);
+            arcDistanceCumulative += Vector3.Distance(BezierCurvePos[iterationI - 1], BezierCurvePos[iterationI]);
+            arcDistance.SetValue(arcDistanceCumulative, iterationI);
+            #endregion
         }
+        for(boneI = 1; boneI <= boneLength; boneI++)
+        {
 
+        }
+        
     }
     public void MoveRotation()
     {
 
     }
+
+
 }

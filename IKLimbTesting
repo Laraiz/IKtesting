@@ -2,45 +2,68 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class IKLimb : MonoBehaviour
+public class IKTesting : MonoBehaviour
 {
     public int boneLength; //amount of bones
     public Transform targetTransform;
     public Transform baseTransform;
 
+    private Vector3 frontCurve;
+    public Vector3 frontCurveEdit;
+    private Vector3 backCurve;
+    public Vector3 backCurveEdit;
+    
+
     public Transform[] boneTransform;
 
-    public float extendedDistance;
-    public float totalDistance;
-    public float[] boneDistance;
+    float extendedDistance;
+    float totalDistance;
+    float[] boneDistance;
 
-    public Quaternion[] boneRotation;
+    Quaternion[] boneRotation;
 
     Vector3[] bonePositionL;
-    public Vector3[] bonePositionG;
+    Vector3[] bonePositionG;
 
+
+    [Header("Delete and make local Variables")]
+    //layer 1 bezier curve cubic
+    public Vector3 position1;
+    public Vector3 position2;  // these need to be decided through a script
+    public Vector3 position3;   //
+    public Vector3 position4;
+    //layer 2
+    public Vector3[] positionA;
+    public Vector3[] positionB;
+    public Vector3[] positionC;
+    //layer 3
+    public Vector3[] positionD;
+    public Vector3[] positionE;
+    //layer 4
+    public Vector3[] finalPosition;
+    //T is the %completion of the curve in .00
+    public float[] t;
     private void Start()
     {
         // get array length here
         boneTransform = new Transform[boneLength];
-        boneDistance = new float[boneLength-1];
+        boneDistance = new float[boneLength - 1];
         boneRotation = new Quaternion[boneLength];
         bonePositionL = new Vector3[boneLength];
         bonePositionG = new Vector3[boneLength];
-        
 
         int i = 0;
         Transform recurseBoneTransform; //could make an array of base transforms for multiple limbs
-       
+
         //initialize array values here
-        for( i= 0; i < boneLength; i++)
+        for (i = 0; i < boneLength; i++)
         {
             if (i == 0)
             {
                 boneTransform.SetValue(baseTransform, 0);
             }
 
-            if(i < boneLength - 1)
+            if (i < boneLength - 1)
             {
                 recurseBoneTransform = boneTransform[i].GetChild(0); //connecting bone needs to be first in position
                 boneTransform.SetValue(recurseBoneTransform, i + 1);
@@ -61,26 +84,53 @@ public class IKLimb : MonoBehaviour
     }
     private void Update()
     {
-        Transform fixedTransform = targetTransform;
-        if(targetTransform.position.magnitude > extendedDistance)
-        {
-            fixedTransform.position = targetTransform.position.normalized * extendedDistance;
-        }
+        PositionCalculation();
+        //to Remove just to avoid null errors, should be given by call
+        frontCurve = baseTransform.localPosition + frontCurveEdit;
+        backCurve = targetTransform.localPosition + backCurveEdit;
 
-        if (targetTransform != boneTransform[boneLength - 1])
-        {
-            PositionCalculation();
-        }
     }
-        /*get line from target to position, then isolate by rotation degrees of freedom, 
-         * rotation should be where vector target is pointing
-         * need actual position with bones that shouldnt be attached
-         * 
-         * 
-         * normalize target distance if above max distance
-         */
+    /*get line from target to position, then isolate by rotation degrees of freedom, 
+     * rotation should be where vector target is pointing
+     * need actual position with bones that shouldnt be attached
+     * normalize target distance if above max distance
+     */
     public void PositionCalculation()
     {
+        int i = 0;
+        
+        //layer 1 bezier curve cubic
+        Vector3 position1 = baseTransform.position;
+        Vector3 position2 = frontCurve;  // these need to be decided through a script
+        Vector3 position3 = backCurve;   //
+        Vector3 position4 = targetTransform.position;
+        //layer 2
+        Vector3[] positionA = new Vector3[boneLength];
+        Vector3[] positionB = new Vector3[boneLength];
+        Vector3[] positionC = new Vector3[boneLength];
+        //layer 3
+        Vector3[] positionD = new Vector3[boneLength];
+        Vector3[] positionE = new Vector3[boneLength];
+        //layer 4
+        Vector3[] finalPosition = new Vector3[boneLength];
+        //T is the %completion of the curve in .00
+        float[] t = new float[boneLength];
+        //firstArrayValue should be 0
+        for(i = 0; i <= boneLength - 1; i++)
+        {
+            t.SetValue((float)i/(float)boneLength + 1/(float)boneLength, i);
+            
+            positionA.SetValue(Vector3.Lerp(position1, position2, t[i]), i);
+            positionB.SetValue(Vector3.Lerp(position2, position3, t[i]), i);
+            positionC.SetValue(Vector3.Lerp(position3, position4, t[i]), i);
+
+            positionD.SetValue(Vector3.Lerp(positionA[i], positionB[i], t[i]), i);
+            positionE.SetValue(Vector3.Lerp(positionB[i], positionC[i], t[i]), i);
+
+            finalPosition.SetValue(Vector3.Lerp(positionD[i], positionE[i], t[i]), i);
+
+            bonePositionG.SetValue(finalPosition[i], i);
+        }
 
     }
     public void MoveRotation()

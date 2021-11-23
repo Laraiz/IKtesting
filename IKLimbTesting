@@ -1,1 +1,90 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
 
+public class IKLimb : MonoBehaviour
+{
+    public int boneLength; //amount of bones
+    public Transform targetTransform;
+    public Transform baseTransform;
+
+    public Transform[] boneTransform;
+
+    public float extendedDistance;
+    public float totalDistance;
+    public float[] boneDistance;
+
+    public Quaternion[] boneRotation;
+
+    Vector3[] bonePositionL;
+    public Vector3[] bonePositionG;
+
+    private void Start()
+    {
+        // get array length here
+        boneTransform = new Transform[boneLength];
+        boneDistance = new float[boneLength-1];
+        boneRotation = new Quaternion[boneLength];
+        bonePositionL = new Vector3[boneLength];
+        bonePositionG = new Vector3[boneLength];
+        
+
+        int i = 0;
+        Transform recurseBoneTransform; //could make an array of base transforms for multiple limbs
+       
+        //initialize array values here
+        for( i= 0; i < boneLength; i++)
+        {
+            if (i == 0)
+            {
+                boneTransform.SetValue(baseTransform, 0);
+            }
+
+            if(i < boneLength - 1)
+            {
+                recurseBoneTransform = boneTransform[i].GetChild(0); //connecting bone needs to be first in position
+                boneTransform.SetValue(recurseBoneTransform, i + 1);
+            }
+
+            boneRotation.SetValue(boneTransform[i].localRotation, i);
+            bonePositionL.SetValue(boneTransform[i].localPosition, i);
+            bonePositionG.SetValue(boneTransform[i].position, i);
+
+            if (i > 0)
+            {
+                Vector3 initialposition = boneTransform[i - 1].position;
+                Vector3 finalPosition = boneTransform[i].position;
+                float distance = Vector3.Distance(initialposition, finalPosition);
+                boneDistance.SetValue(distance, i - 1);
+            }
+        }
+    }
+    private void Update()
+    {
+        Transform fixedTransform = targetTransform;
+        if(targetTransform.position.magnitude > extendedDistance)
+        {
+            fixedTransform.position = targetTransform.position.normalized * extendedDistance;
+        }
+
+        if (targetTransform != boneTransform[boneLength - 1])
+        {
+            PositionCalculation();
+        }
+    }
+        /*get line from target to position, then isolate by rotation degrees of freedom, 
+         * rotation should be where vector target is pointing
+         * need actual position with bones that shouldnt be attached
+         * 
+         * 
+         * normalize target distance if above max distance
+         */
+    public void PositionCalculation()
+    {
+
+    }
+    public void MoveRotation()
+    {
+
+    }
+}
